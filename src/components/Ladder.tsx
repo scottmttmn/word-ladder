@@ -1,0 +1,46 @@
+import type { LadderStep, Puzzle } from '../engine/types'
+import WordRow from './WordRow'
+import MoveTypeBadge from './MoveTypeBadge'
+
+interface LadderProps {
+  ladder: LadderStep[]
+  puzzle: Puzzle
+  interactive?: boolean
+}
+
+export default function Ladder({ ladder, puzzle, interactive = true }: LadderProps) {
+  const isComplete = ladder[ladder.length - 1]?.word === puzzle.endWord
+
+  return (
+    <div className="ladder">
+      {ladder.map((step, i) => (
+        <div key={i} className="ladder-step">
+          {step.moveType && (
+            <div className="ladder-connector">
+              <div className="connector-line" />
+              <MoveTypeBadge moveType={step.moveType} animated={interactive} />
+              <div className="connector-line" />
+            </div>
+          )}
+          <WordRow
+            word={step.word}
+            variant={i === 0 ? 'start' : step.word === puzzle.endWord ? 'end' : 'default'}
+            animated={interactive && i === ladder.length - 1 && i > 0}
+          />
+        </div>
+      ))}
+
+      {/* Show target word as ghost if not yet reached */}
+      {!isComplete && (
+        <div className="ladder-step">
+          <div className="ladder-connector">
+            <div className="connector-line connector-line-dashed" />
+            <div className="connector-dots">...</div>
+            <div className="connector-line connector-line-dashed" />
+          </div>
+          <WordRow word={puzzle.endWord} variant="ghost" />
+        </div>
+      )}
+    </div>
+  )
+}

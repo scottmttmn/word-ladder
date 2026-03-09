@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --version)",
+      "Bash(npm --version)",
+      "Bash(npm view cmu-pronouncing-dictionary)",
+      "Bash(npm view vite-plugin-pwa)",
+      "Bash(npm view cmu-pronouncing-dictionary version)",
+      "Bash(npm pack cmu-pronouncing-dictionary --dry-run)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(npm create vite@latest . -- --template react-ts)",
+      "Bash(npx --yes create-vite@latest . --template react-ts)",
+      "Bash(npm install)",
+      "Bash(npx vite build)",
+      "Bash(node -e \"const d = require\\(''cmu-pronouncing-dictionary''\\); console.log\\(typeof d, Object.keys\\(d\\).slice\\(0,5\\)\\); const entries = Object.entries\\(d\\); console.log\\(''Total entries:'', entries.length\\); console.log\\(''Sample:'', entries.slice\\(0,5\\)\\)\")",
+      "Bash(npx tsx /Users/scottmittman/Code/word-ladder/scripts/build-dictionary.ts)",
+      "Bash(node -e \"import\\(''cmu-pronouncing-dictionary''\\).then\\(m => console.log\\(typeof m.default, Object.keys\\(m\\).slice\\(0,10\\)\\)\\)\")",
+      "Bash(npm ls google-10000-english)",
+      "Bash(npm ls popular-english-words)",
+      "Bash(npm install -D an-array-of-english-words)",
+      "Bash(node -e \":*)",
+      "Bash(gzip -c /Users/scottmittman/Code/word-ladder/data/dictionary.json)",
+      "Bash(npx tsc --noEmit)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(curl -s http://localhost:5173/)",
+      "Bash(npx vitest run)"
+    ]
+  }
+}
