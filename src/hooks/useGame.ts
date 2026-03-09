@@ -10,6 +10,10 @@ import { classifyMove } from '../engine/moves'
 import { loadDictionary, getWordSet } from '../engine/dictionary'
 import { decodeShareUrl } from '../engine/sharing'
 
+// Capture the initial URL hash at module load time, before React StrictMode
+// can double-fire useEffect and clear it on the first pass.
+const initialHash = window.location.hash
+
 export type GamePhase = 'loading' | 'menu' | 'playing' | 'victory' | 'shared-view'
 export type GameMode = 'daily' | 'freeplay'
 
@@ -23,6 +27,7 @@ export interface GameState {
   activeMoveTypes: Set<MoveType>
   difficulty: number
   error: string | null
+  sharerMoveCount: number | null
 }
 
 type GameAction =
@@ -38,7 +43,7 @@ type GameAction =
   | { type: 'SET_ERROR'; error: string }
   | { type: 'CLEAR_ERROR' }
   | { type: 'GO_TO_MENU' }
-  | { type: 'LOAD_SHARED'; ladder: LadderStep[]; puzzle: Puzzle }
+  | { type: 'LOAD_SHARED'; puzzle: Puzzle; sharerMoveCount: number }
 
 const initialState: GameState = {
   phase: 'loading',
@@ -50,6 +55,7 @@ const initialState: GameState = {
   activeMoveTypes: new Set(MOVE_TYPES),
   difficulty: 4,
   error: null,
+  sharerMoveCount: null,
 }
 
 function gameReducer(state: GameState, action: GameAction): GameState {
@@ -133,13 +139,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'CLEAR_ERROR':
       return { ...state, error: null }
     case 'GO_TO_MENU':
-      return { ...state, phase: 'menu', puzzle: null, ladder: [], error: null }
+      return { ...state, phase: 'menu', puzzle: null, ladder: [], error: null, sharerMoveCount: null }
     case 'LOAD_SHARED':
       return {
         ...state,
         phase: 'shared-view',
         puzzle: action.puzzle,
-        ladder: action.ladder,
+        ladder: [{ word: action.puzzle.startWord, moveType: null }],
+        sharerMoveCount: action.sharerMoveCount,
+        activeMoveTypes: new Set(action.puzzle.activeMoveTypes),
         error: null,
       }
     default:
@@ -156,11 +164,10 @@ export function useGame() {
     dispatch({ type: 'INIT', dictionary, graph })
 
     // Check for shared puzzle in URL
-    const shareData = decodeShareUrl(window.location.hash)
+    const shareData = decodeShareUrl(initialHash)
     if (shareData && graph) {
       const wordSet = getWordSet(dictionary)
-      const allValid = shareData.path.every(w => wordSet.has(w))
-      if (allValid) {
+      if (wordSet.has(shareData.startWord) && wordSet.has(shareData.endWord)) {
         const result = findShortestPath(
           shareData.startWord,
           shareData.endWord,
@@ -173,13 +180,7 @@ export function useGame() {
           activeMoveTypes: shareData.activeMoveTypes,
           optimalLength: result.pathLength,
         }
-        const ladder: LadderStep[] = shareData.path.map((word, i) => ({
-          word,
-          moveType: i === 0
-            ? null
-            : classifyMove(shareData.path[i - 1], word, graph.phonemes),
-        }))
-        dispatch({ type: 'LOAD_SHARED', ladder, puzzle })
+        dispatch({ type: 'LOAD_SHARED', puzzle, sharerMoveCount: shareData.moveCount })
         // Clear the hash so refreshing starts fresh
         window.history.replaceState(null, '', window.location.pathname)
       }

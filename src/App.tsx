@@ -72,15 +72,20 @@ function App() {
         <div className="game-screen">
           <PuzzleInfo
             puzzle={state.puzzle}
-            moveCount={state.ladder.length - 1}
+            moveCount={0}
           />
           <div className="shared-banner">
-            Shared solution
+            <span className="shared-challenge-icon">🏆</span>
+            <p className="shared-challenge-text">
+              Your friend solved this in <strong>{state.sharerMoveCount}</strong> move{state.sharerMoveCount !== 1 ? 's' : ''}.
+              {state.sharerMoveCount === state.puzzle.optimalLength
+                ? ' Can you match them?'
+                : ' Can you beat them?'}
+            </p>
           </div>
-          <Ladder ladder={state.ladder} puzzle={state.puzzle} interactive={false} />
           <div className="action-bar">
             <button className="btn btn-primary" onClick={playSharedPuzzle}>
-              Try This Puzzle
+              Play This Puzzle
             </button>
             <button className="btn btn-ghost" onClick={() => dispatch({ type: 'GO_TO_MENU' })}>
               Menu
@@ -134,6 +139,7 @@ function App() {
             <VictoryModal
               puzzle={state.puzzle}
               ladder={state.ladder}
+              sharerMoveCount={state.sharerMoveCount}
               onPlayAgain={handleNewPuzzle}
               onMenu={() => dispatch({ type: 'GO_TO_MENU' })}
             />

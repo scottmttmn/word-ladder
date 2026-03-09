@@ -613,13 +613,30 @@ button {
 
 .shared-banner {
   text-align: center;
-  font-size: var(--font-size-small);
-  font-weight: 600;
-  color: var(--color-classic);
-  background: #eef4fc;
-  padding: 0.3rem 1rem;
-  border-radius: 20px;
+  padding: 1.5rem 1.5rem;
+  margin: 1rem 0;
+  border-radius: var(--radius-button);
+  background: linear-gradient(135deg, #eef4fc, #f0e6ff);
+  border: 1px solid var(--color-border);
+  max-width: 22rem;
+}
+
+.shared-challenge-icon {
+  font-size: 2.5rem;
+  display: block;
   margin-bottom: 0.5rem;
+}
+
+.shared-challenge-text {
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.shared-challenge-text strong {
+  color: var(--color-classic);
+  font-size: 1.2em;
 }
 
 /* ========== MODALS ========== */

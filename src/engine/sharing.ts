@@ -5,7 +5,7 @@ export interface ShareData {
   startWord: string
   endWord: string
   activeMoveTypes: MoveType[]
-  path: string[]
+  moveCount: number
 }
 
 const SHORT_TO_MOVE: Record<string, MoveType> = {}
@@ -14,7 +14,8 @@ for (const mt of MOVE_TYPES) {
 }
 
 /**
- * Encode a completed puzzle solution into a URL hash string.
+ * Encode a puzzle challenge into a URL hash string.
+ * Does NOT include the solution — only the puzzle and the sharer's move count.
  */
 export function encodeShareUrl(data: ShareData): string {
   const moveShorts = data.activeMoveTypes
@@ -24,7 +25,7 @@ export function encodeShareUrl(data: ShareData): string {
     s: data.startWord,
     e: data.endWord,
     m: moveShorts,
-    p: data.path.join(','),
+    n: String(data.moveCount),
   })
   return `#${params.toString()}`
 }
@@ -40,9 +41,9 @@ export function decodeShareUrl(hash: string): ShareData | null {
     const startWord = params.get('s')
     const endWord = params.get('e')
     const movesStr = params.get('m')
-    const pathStr = params.get('p')
+    const moveCountStr = params.get('n')
 
-    if (!startWord || !endWord || !movesStr || !pathStr) return null
+    if (!startWord || !endWord || !movesStr || !moveCountStr) return null
 
     const activeMoveTypes = movesStr
       .split(',')
@@ -51,11 +52,10 @@ export function decodeShareUrl(hash: string): ShareData | null {
 
     if (activeMoveTypes.length === 0) return null
 
-    const path = pathStr.split(',').filter(w => w.length > 0)
-    if (path.length < 2) return null
-    if (path[0] !== startWord || path[path.length - 1] !== endWord) return null
+    const moveCount = parseInt(moveCountStr, 10)
+    if (isNaN(moveCount) || moveCount < 1) return null
 
-    return { startWord, endWord, activeMoveTypes, path }
+    return { startWord, endWord, activeMoveTypes, moveCount }
   } catch {
     return null
   }

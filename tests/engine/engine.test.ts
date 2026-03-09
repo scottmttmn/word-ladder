@@ -186,14 +186,14 @@ describe('sharing', () => {
       startWord: 'cold',
       endWord: 'warm',
       activeMoveTypes: ['classic' as const, 'rhyme' as const],
-      path: ['cold', 'cord', 'word', 'ward', 'warm'],
+      moveCount: 5,
     }
     const hash = encodeShareUrl(original)
     const decoded = decodeShareUrl(hash)
     expect(decoded).not.toBeNull()
     expect(decoded!.startWord).toBe('cold')
     expect(decoded!.endWord).toBe('warm')
-    expect(decoded!.path).toEqual(['cold', 'cord', 'word', 'ward', 'warm'])
+    expect(decoded!.moveCount).toBe(5)
     expect(decoded!.activeMoveTypes).toEqual(['classic', 'rhyme'])
   })
 

@@ -29,7 +29,7 @@ export default function HowToPlayModal({ onClose }: HowToPlayModalProps) {
           </div>
         </div>
 
-        <p>Try to match or beat the <strong>optimal</strong> number of moves!</p>
+        <p>Try to reach the end word in as few moves as possible — can you match the <strong>optimal</strong> solution?</p>
 
         <button className="btn btn-primary" onClick={onClose}>Got it!</button>
       </div>

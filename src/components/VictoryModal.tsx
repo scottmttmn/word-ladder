@@ -5,21 +5,24 @@ import { useState } from 'react'
 interface VictoryModalProps {
   puzzle: Puzzle
   ladder: LadderStep[]
+  sharerMoveCount: number | null
   onPlayAgain: () => void
   onMenu: () => void
 }
 
-export default function VictoryModal({ puzzle, ladder, onPlayAgain, onMenu }: VictoryModalProps) {
+export default function VictoryModal({ puzzle, ladder, sharerMoveCount, onPlayAgain, onMenu }: VictoryModalProps) {
   const [copied, setCopied] = useState(false)
   const moveCount = ladder.length - 1
   const isOptimal = moveCount === puzzle.optimalLength
+  const beatSharer = sharerMoveCount !== null && moveCount < sharerMoveCount
+  const tiedSharer = sharerMoveCount !== null && moveCount === sharerMoveCount
 
   const handleShare = async () => {
     const url = buildShareUrl({
       startWord: puzzle.startWord,
       endWord: puzzle.endWord,
       activeMoveTypes: puzzle.activeMoveTypes,
-      path: ladder.map(s => s.word),
+      moveCount,
     })
     try {
       await navigator.clipboard.writeText(url)
@@ -42,7 +45,7 @@ export default function VictoryModal({ puzzle, ladder, onPlayAgain, onMenu }: Vi
     <div className="modal-overlay" onClick={onMenu}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <h2 className="victory-title">
-          {isOptimal ? 'Perfect!' : 'Well Done!'}
+          {isOptimal ? 'Perfect!' : beatSharer ? 'You Beat Them!' : tiedSharer ? 'You Matched Them!' : 'Well Done!'}
         </h2>
         <div className="victory-stats">
           <div className="victory-stat">
@@ -53,9 +56,21 @@ export default function VictoryModal({ puzzle, ladder, onPlayAgain, onMenu }: Vi
             <span className="stat-value">{puzzle.optimalLength}</span>
             <span className="stat-label">Optimal</span>
           </div>
+          {sharerMoveCount !== null && (
+            <div className="victory-stat">
+              <span className="stat-value">{sharerMoveCount}</span>
+              <span className="stat-label">Friend</span>
+            </div>
+          )}
         </div>
         {isOptimal && (
           <p className="victory-message">You found the shortest path!</p>
+        )}
+        {!isOptimal && beatSharer && (
+          <p className="victory-message">You beat your friend's score!</p>
+        )}
+        {!isOptimal && tiedSharer && (
+          <p className="victory-message">You matched your friend's score!</p>
         )}
         <div className="victory-path">
           {ladder.map((step, i) => (
