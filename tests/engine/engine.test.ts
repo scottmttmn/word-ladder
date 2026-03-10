@@ -181,12 +181,13 @@ describe('daily puzzle', () => {
 })
 
 describe('sharing', () => {
-  it('encodes and decodes share URLs', () => {
+  it('encodes and decodes share URLs with move type sequence', () => {
     const original = {
       startWord: 'cold',
       endWord: 'warm',
       activeMoveTypes: ['classic' as const, 'rhyme' as const],
       moveCount: 5,
+      moveTypeSequence: ['classic' as const, 'classic' as const, 'rhyme' as const, 'classic' as const, 'classic' as const],
     }
     const hash = encodeShareUrl(original)
     const decoded = decodeShareUrl(hash)
@@ -195,6 +196,15 @@ describe('sharing', () => {
     expect(decoded!.endWord).toBe('warm')
     expect(decoded!.moveCount).toBe(5)
     expect(decoded!.activeMoveTypes).toEqual(['classic', 'rhyme'])
+    expect(decoded!.moveTypeSequence).toEqual(['classic', 'classic', 'rhyme', 'classic', 'classic'])
+  })
+
+  it('handles missing move type sequence gracefully', () => {
+    // Old-format URLs without t= param should still decode
+    const hash = '#s=cold&e=warm&m=c%2Cr&n=5'
+    const decoded = decodeShareUrl(hash)
+    expect(decoded).not.toBeNull()
+    expect(decoded!.moveTypeSequence).toEqual([])
   })
 
   it('returns null for invalid hash', () => {

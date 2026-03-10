@@ -639,6 +639,14 @@ button {
   font-size: 1.2em;
 }
 
+.shared-move-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  justify-content: center;
+  margin-top: 0.75rem;
+}
+
 /* ========== MODALS ========== */
 .modal-overlay {
   position: fixed;

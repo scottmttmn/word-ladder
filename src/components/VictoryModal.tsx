@@ -1,5 +1,5 @@
-import type { Puzzle, LadderStep } from '../engine/types'
-import { buildShareUrl } from '../engine/sharing'
+import type { Puzzle, LadderStep, MoveType } from '../engine/types'
+import { buildShareText } from '../engine/sharing'
 import { useState } from 'react'
 
 interface VictoryModalProps {
@@ -8,9 +8,10 @@ interface VictoryModalProps {
   sharerMoveCount: number | null
   onPlayAgain: () => void
   onMenu: () => void
+  onReview: () => void
 }
 
-export default function VictoryModal({ puzzle, ladder, sharerMoveCount, onPlayAgain, onMenu }: VictoryModalProps) {
+export default function VictoryModal({ puzzle, ladder, sharerMoveCount, onPlayAgain, onMenu, onReview }: VictoryModalProps) {
   const [copied, setCopied] = useState(false)
   const moveCount = ladder.length - 1
   const isOptimal = moveCount === puzzle.optimalLength
@@ -18,24 +19,33 @@ export default function VictoryModal({ puzzle, ladder, sharerMoveCount, onPlayAg
   const tiedSharer = sharerMoveCount !== null && moveCount === sharerMoveCount
 
   const handleShare = async () => {
-    const url = buildShareUrl({
+    const moveTypeSequence = ladder
+      .slice(1)
+      .map(s => s.moveType)
+      .filter((mt): mt is MoveType => mt !== null)
+
+    const shareData = {
       startWord: puzzle.startWord,
       endWord: puzzle.endWord,
       activeMoveTypes: puzzle.activeMoveTypes,
       moveCount,
-    })
+      moveTypeSequence,
+    }
+
+    const text = buildShareText(shareData, ladder, puzzle.optimalLength)
+
     try {
-      await navigator.clipboard.writeText(url)
+      await navigator.clipboard.writeText(text)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
       // Fallback for older browsers
-      const input = document.createElement('input')
-      input.value = url
-      document.body.appendChild(input)
-      input.select()
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      document.body.appendChild(textarea)
+      textarea.select()
       document.execCommand('copy')
-      document.body.removeChild(input)
+      document.body.removeChild(textarea)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }
@@ -86,6 +96,9 @@ export default function VictoryModal({ puzzle, ladder, sharerMoveCount, onPlayAg
           </button>
           <button className="btn btn-secondary" onClick={onPlayAgain}>
             New Puzzle
+          </button>
+          <button className="btn btn-ghost" onClick={onReview}>
+            View Puzzle
           </button>
           <button className="btn btn-ghost" onClick={onMenu}>
             Menu

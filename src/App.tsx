@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useGame } from './hooks/useGame'
 import Header from './components/Header'
 import MenuScreen from './components/MenuScreen'
@@ -6,6 +6,7 @@ import Ladder from './components/Ladder'
 import WordInput from './components/WordInput'
 import PuzzleInfo from './components/PuzzleInfo'
 import MoveTypeToggles from './components/MoveTypeToggles'
+import MoveTypeBadge from './components/MoveTypeBadge'
 import VictoryModal from './components/VictoryModal'
 import HowToPlayModal from './components/HowToPlayModal'
 import { formatDailyDate } from './engine/daily'
@@ -22,10 +23,20 @@ function App() {
   } = useGame()
 
   const [showHelp, setShowHelp] = useState(false)
+  const [showVictoryModal, setShowVictoryModal] = useState(true)
+  const prevPhaseRef = useRef(state.phase)
 
   useEffect(() => {
     init()
   }, [init])
+
+  // Reset the victory modal visibility when entering victory phase
+  useEffect(() => {
+    if (state.phase === 'victory' && prevPhaseRef.current !== 'victory') {
+      setShowVictoryModal(true)
+    }
+    prevPhaseRef.current = state.phase
+  }, [state.phase])
 
   const handleNewPuzzle = () => {
     if (state.mode === 'daily') {
@@ -82,6 +93,13 @@ function App() {
                 ? ' Can you match them?'
                 : ' Can you beat them?'}
             </p>
+            {state.sharerMoveTypes && state.sharerMoveTypes.length > 0 && (
+              <div className="shared-move-types">
+                {state.sharerMoveTypes.map((mt, i) => (
+                  <MoveTypeBadge key={i} moveType={mt} />
+                ))}
+              </div>
+            )}
           </div>
           <div className="action-bar">
             <button className="btn btn-primary" onClick={playSharedPuzzle}>
@@ -135,14 +153,29 @@ function App() {
             </>
           )}
 
-          {state.phase === 'victory' && (
+          {state.phase === 'victory' && showVictoryModal && (
             <VictoryModal
               puzzle={state.puzzle}
               ladder={state.ladder}
               sharerMoveCount={state.sharerMoveCount}
               onPlayAgain={handleNewPuzzle}
               onMenu={() => dispatch({ type: 'GO_TO_MENU' })}
+              onReview={() => setShowVictoryModal(false)}
             />
+          )}
+
+          {state.phase === 'victory' && !showVictoryModal && (
+            <div className="action-bar">
+              <button className="btn btn-primary" onClick={() => setShowVictoryModal(true)}>
+                Results
+              </button>
+              <button className="btn btn-secondary" onClick={handleNewPuzzle}>
+                New Puzzle
+              </button>
+              <button className="btn btn-ghost" onClick={() => dispatch({ type: 'GO_TO_MENU' })}>
+                Menu
+              </button>
+            </div>
           )}
         </div>
       )}

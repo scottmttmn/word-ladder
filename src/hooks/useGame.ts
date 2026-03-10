@@ -28,6 +28,7 @@ export interface GameState {
   difficulty: number
   error: string | null
   sharerMoveCount: number | null
+  sharerMoveTypes: MoveType[] | null
 }
 
 type GameAction =
@@ -43,7 +44,7 @@ type GameAction =
   | { type: 'SET_ERROR'; error: string }
   | { type: 'CLEAR_ERROR' }
   | { type: 'GO_TO_MENU' }
-  | { type: 'LOAD_SHARED'; puzzle: Puzzle; sharerMoveCount: number }
+  | { type: 'LOAD_SHARED'; puzzle: Puzzle; sharerMoveCount: number; sharerMoveTypes: MoveType[] }
 
 const initialState: GameState = {
   phase: 'loading',
@@ -56,6 +57,7 @@ const initialState: GameState = {
   difficulty: 4,
   error: null,
   sharerMoveCount: null,
+  sharerMoveTypes: null,
 }
 
 function gameReducer(state: GameState, action: GameAction): GameState {
@@ -139,7 +141,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'CLEAR_ERROR':
       return { ...state, error: null }
     case 'GO_TO_MENU':
-      return { ...state, phase: 'menu', puzzle: null, ladder: [], error: null, sharerMoveCount: null }
+      return { ...state, phase: 'menu', puzzle: null, ladder: [], error: null, sharerMoveCount: null, sharerMoveTypes: null }
     case 'LOAD_SHARED':
       return {
         ...state,
@@ -147,6 +149,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         puzzle: action.puzzle,
         ladder: [{ word: action.puzzle.startWord, moveType: null }],
         sharerMoveCount: action.sharerMoveCount,
+        sharerMoveTypes: action.sharerMoveTypes,
         activeMoveTypes: new Set(action.puzzle.activeMoveTypes),
         error: null,
       }
@@ -180,7 +183,7 @@ export function useGame() {
           activeMoveTypes: shareData.activeMoveTypes,
           optimalLength: result.pathLength,
         }
-        dispatch({ type: 'LOAD_SHARED', puzzle, sharerMoveCount: shareData.moveCount })
+        dispatch({ type: 'LOAD_SHARED', puzzle, sharerMoveCount: shareData.moveCount, sharerMoveTypes: shareData.moveTypeSequence })
         // Clear the hash so refreshing starts fresh
         window.history.replaceState(null, '', window.location.pathname)
       }
