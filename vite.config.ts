@@ -8,7 +8,7 @@ const basePath = process.env.GITHUB_ACTIONS && repoName ? `/${repoName}/` : '/'
 export default defineConfig({
   base: basePath,
   build: {
-    chunkSizeWarningLimit: 1200,
+    chunkSizeWarningLimit: 2000,
     rollupOptions: {
       output: {
         manualChunks: {

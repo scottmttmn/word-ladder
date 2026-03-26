@@ -21,7 +21,7 @@ beforeAll(() => {
 
 describe('dictionary', () => {
   it('loads words', () => {
-    expect(data.words.length).toBeGreaterThan(10000)
+    expect(data.words.length).toBeGreaterThan(100000)
   })
 
   it('contains common words', () => {
@@ -30,8 +30,20 @@ describe('dictionary', () => {
     }
   })
 
-  it('has phonemes for words', () => {
+  it('has phonemes for CMU words', () => {
     expect(data.phonemes['cat']).toBe('K AE1 T')
+  })
+
+  it('includes words without phonemes', () => {
+    expect(wordSet.has('clove')).toBe(true)
+    expect(wordSet.has('miso')).toBe(true)
+    expect(data.phonemes['clove']).toBeUndefined()
+    expect(data.phonemes['miso']).toBeUndefined()
+  })
+
+  it('classifies moves for words without phonemes', () => {
+    // clove -> cove is add-remove (remove 'l')
+    expect(classifyMove('clove', 'cove', data.phonemes)).toBe('add-remove')
   })
 })
 
