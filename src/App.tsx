@@ -5,11 +5,13 @@ import MenuScreen from './components/MenuScreen'
 import Ladder from './components/Ladder'
 import WordInput from './components/WordInput'
 import PuzzleInfo from './components/PuzzleInfo'
+import ExploreInfo from './components/ExploreInfo'
 import MoveTypeToggles from './components/MoveTypeToggles'
 import MoveTypeBadge from './components/MoveTypeBadge'
 import VictoryModal from './components/VictoryModal'
 import HowToPlayModal from './components/HowToPlayModal'
 import { formatDailyDate } from './engine/daily'
+import type { PlaySession } from './engine/types'
 
 function App() {
   const {
@@ -18,8 +20,11 @@ function App() {
     init,
     submitWord,
     startFreeplay,
+    startExploration,
     startDaily,
     playSharedPuzzle,
+    undo,
+    reset,
   } = useGame()
 
   const [showHelp, setShowHelp] = useState(false)
@@ -41,10 +46,18 @@ function App() {
   const handleNewPuzzle = () => {
     if (state.mode === 'daily') {
       startDaily()
+    } else if (state.freeplayVariant === 'explore' && state.exploreStartWord) {
+      startExploration(state.exploreStartWord)
     } else {
       startFreeplay()
     }
   }
+
+  const activeSession: PlaySession | null = state.puzzle
+    ? { kind: 'puzzle', puzzle: state.puzzle }
+    : state.exploreStartWord
+      ? { kind: 'explore', startWord: state.exploreStartWord }
+      : null
 
   if (state.phase === 'loading') {
     return (
@@ -69,11 +82,14 @@ function App() {
       {state.phase === 'menu' && (
         <MenuScreen
           mode={state.mode}
+          freeplayVariant={state.freeplayVariant}
           difficulty={state.difficulty}
           activeMoveTypes={state.activeMoveTypes}
           error={state.error}
           onStartDaily={startDaily}
           onStartFreeplay={startFreeplay}
+          onStartExploration={startExploration}
+          onSetFreeplayVariant={variant => dispatch({ type: 'SET_FREEPLAY_VARIANT', variant })}
           onToggleMoveType={mt => dispatch({ type: 'TOGGLE_MOVE_TYPE', moveType: mt })}
           onSetDifficulty={d => dispatch({ type: 'SET_DIFFICULTY', difficulty: d })}
         />
@@ -112,18 +128,27 @@ function App() {
         </div>
       )}
 
-      {(state.phase === 'playing' || state.phase === 'victory') && state.puzzle && (
+      {(state.phase === 'playing' || state.phase === 'victory') && activeSession && (
         <div className="game-screen">
-          <PuzzleInfo
-            puzzle={state.puzzle}
-            moveCount={state.ladder.length - 1}
-            dailyDate={state.mode === 'daily' ? formatDailyDate(new Date()) : undefined}
-          />
+          {state.puzzle ? (
+            <PuzzleInfo
+              puzzle={state.puzzle}
+              moveCount={state.ladder.length - 1}
+              dailyDate={state.mode === 'daily' ? formatDailyDate(new Date()) : undefined}
+            />
+          ) : (
+            <ExploreInfo
+              startWord={state.exploreStartWord!}
+              currentWord={state.ladder[state.ladder.length - 1].word}
+              moveCount={state.ladder.length - 1}
+              remainingMoveCount={state.remainingMoveCount ?? 0}
+            />
+          )}
           <MoveTypeToggles
             activeMoveTypes={state.activeMoveTypes}
             onToggle={mt => dispatch({ type: 'TOGGLE_MOVE_TYPE', moveType: mt })}
           />
-          <Ladder ladder={state.ladder} puzzle={state.puzzle} />
+          <Ladder ladder={state.ladder} session={activeSession} />
 
           {state.phase === 'playing' && (
             <>
@@ -134,14 +159,14 @@ function App() {
               <div className="action-bar">
                 <button
                   className="btn btn-ghost"
-                  onClick={() => dispatch({ type: 'UNDO' })}
+                  onClick={undo}
                   disabled={state.ladder.length <= 1}
                 >
                   Undo
                 </button>
                 <button
                   className="btn btn-ghost"
-                  onClick={() => dispatch({ type: 'RESET' })}
+                  onClick={reset}
                   disabled={state.ladder.length <= 1}
                 >
                   Reset
@@ -155,9 +180,10 @@ function App() {
 
           {state.phase === 'victory' && showVictoryModal && (
             <VictoryModal
-              puzzle={state.puzzle}
+              puzzle={state.puzzle ?? undefined}
               ladder={state.ladder}
               sharerMoveCount={state.sharerMoveCount}
+              exploreEndedReason={state.exploreEndedReason}
               onPlayAgain={handleNewPuzzle}
               onMenu={() => dispatch({ type: 'GO_TO_MENU' })}
               onReview={() => setShowVictoryModal(false)}

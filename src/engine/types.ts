@@ -28,6 +28,18 @@ export interface Puzzle {
   optimalLength: number // number of steps (edges) in shortest path
 }
 
+export interface ExploreSession {
+  kind: 'explore'
+  startWord: string
+}
+
+export interface PuzzleSession {
+  kind: 'puzzle'
+  puzzle: Puzzle
+}
+
+export type PlaySession = PuzzleSession | ExploreSession
+
 export interface DictionaryData {
   words: string[]
   phonemes: Record<string, string>

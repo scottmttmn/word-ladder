@@ -1,24 +1,37 @@
 import type { Puzzle, LadderStep, MoveType } from '../engine/types'
 import { buildShareText } from '../engine/sharing'
 import { useState } from 'react'
+import type { ExploreEndedReason } from '../hooks/useGame'
 
 interface VictoryModalProps {
-  puzzle: Puzzle
+  puzzle?: Puzzle
   ladder: LadderStep[]
   sharerMoveCount: number | null
+  exploreEndedReason?: ExploreEndedReason
   onPlayAgain: () => void
   onMenu: () => void
   onReview: () => void
 }
 
-export default function VictoryModal({ puzzle, ladder, sharerMoveCount, onPlayAgain, onMenu, onReview }: VictoryModalProps) {
+export default function VictoryModal({
+  puzzle,
+  ladder,
+  sharerMoveCount,
+  exploreEndedReason = null,
+  onPlayAgain,
+  onMenu,
+  onReview,
+}: VictoryModalProps) {
   const [copied, setCopied] = useState(false)
   const moveCount = ladder.length - 1
-  const isOptimal = moveCount === puzzle.optimalLength
+  const isExploration = !puzzle
+  const isOptimal = puzzle ? moveCount === puzzle.optimalLength : false
   const beatSharer = sharerMoveCount !== null && moveCount < sharerMoveCount
   const tiedSharer = sharerMoveCount !== null && moveCount === sharerMoveCount
 
   const handleShare = async () => {
+    if (!puzzle) return
+
     const moveTypeSequence = ladder
       .slice(1)
       .map(s => s.moveType)
@@ -55,17 +68,21 @@ export default function VictoryModal({ puzzle, ladder, sharerMoveCount, onPlayAg
     <div className="modal-overlay" onClick={onMenu}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <h2 className="victory-title">
-          {isOptimal ? 'Perfect!' : beatSharer ? 'You Beat Them!' : tiedSharer ? 'You Matched Them!' : 'Well Done!'}
+          {isExploration
+            ? exploreEndedReason === 'stuck' ? "You're Stuck" : 'Run Complete'
+            : isOptimal ? 'Perfect!' : beatSharer ? 'You Beat Them!' : tiedSharer ? 'You Matched Them!' : 'Well Done!'}
         </h2>
         <div className="victory-stats">
           <div className="victory-stat">
             <span className="stat-value">{moveCount}</span>
-            <span className="stat-label">Moves</span>
+            <span className="stat-label">{isExploration ? 'Chain' : 'Moves'}</span>
           </div>
-          <div className="victory-stat">
-            <span className="stat-value">{puzzle.optimalLength}</span>
-            <span className="stat-label">Optimal</span>
-          </div>
+          {puzzle && (
+            <div className="victory-stat">
+              <span className="stat-value">{puzzle.optimalLength}</span>
+              <span className="stat-label">Optimal</span>
+            </div>
+          )}
           {sharerMoveCount !== null && (
             <div className="victory-stat">
               <span className="stat-value">{sharerMoveCount}</span>
@@ -73,13 +90,20 @@ export default function VictoryModal({ puzzle, ladder, sharerMoveCount, onPlayAg
             </div>
           )}
         </div>
-        {isOptimal && (
+        {isExploration && (
+          <p className="victory-message">
+            {exploreEndedReason === 'stuck'
+              ? 'No unused valid moves remain from your current word.'
+              : 'Your exploratory run has ended.'}
+          </p>
+        )}
+        {!isExploration && isOptimal && (
           <p className="victory-message">You found the shortest path!</p>
         )}
-        {!isOptimal && beatSharer && (
+        {!isExploration && !isOptimal && beatSharer && (
           <p className="victory-message">You beat your friend's score!</p>
         )}
-        {!isOptimal && tiedSharer && (
+        {!isExploration && !isOptimal && tiedSharer && (
           <p className="victory-message">You matched your friend's score!</p>
         )}
         <div className="victory-path">
@@ -91,14 +115,16 @@ export default function VictoryModal({ puzzle, ladder, sharerMoveCount, onPlayAg
           ))}
         </div>
         <div className="victory-actions">
-          <button className="btn btn-primary" onClick={handleShare}>
-            {copied ? 'Copied!' : 'Share'}
-          </button>
-          <button className="btn btn-secondary" onClick={onPlayAgain}>
-            New Puzzle
+          {puzzle && (
+            <button className="btn btn-primary" onClick={handleShare}>
+              {copied ? 'Copied!' : 'Share'}
+            </button>
+          )}
+          <button className={puzzle ? 'btn btn-secondary' : 'btn btn-primary'} onClick={onPlayAgain}>
+            {puzzle ? 'New Puzzle' : 'New Run'}
           </button>
           <button className="btn btn-ghost" onClick={onReview}>
-            View Puzzle
+            {puzzle ? 'View Puzzle' : 'Review Run'}
           </button>
           <button className="btn btn-ghost" onClick={onMenu}>
             Menu

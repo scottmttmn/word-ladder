@@ -91,3 +91,12 @@ export function getNeighbors(
 
   return result
 }
+
+export function getUnusedNeighborCount(
+  word: string,
+  graph: WordGraph,
+  activeMoveTypes: MoveType[],
+  visitedWords: Set<string>
+): number {
+  return getNeighbors(word, graph, activeMoveTypes).filter(neighbor => !visitedWords.has(neighbor)).length
+}

@@ -2,7 +2,7 @@ import { useReducer, useCallback } from 'react'
 import type { MoveType, Puzzle, LadderStep, DictionaryData } from '../engine/types'
 import { MOVE_TYPES } from '../engine/types'
 import type { WordGraph } from '../engine/graph'
-import { buildGraph } from '../engine/graph'
+import { buildGraph, getUnusedNeighborCount } from '../engine/graph'
 import { findShortestPath } from '../engine/solver'
 import { generatePuzzle } from '../engine/generator'
 import { getDailyPuzzle } from '../engine/daily'
@@ -12,17 +12,23 @@ import { decodeShareUrl } from '../engine/sharing'
 
 // Capture the initial URL hash at module load time, before React StrictMode
 // can double-fire useEffect and clear it on the first pass.
-const initialHash = window.location.hash
+const initialHash = typeof window !== 'undefined' ? window.location.hash : ''
 
 export type GamePhase = 'loading' | 'menu' | 'playing' | 'victory' | 'shared-view'
 export type GameMode = 'daily' | 'freeplay'
+export type FreeplayVariant = 'puzzle' | 'explore'
+export type ExploreEndedReason = 'stuck' | 'manual' | null
 
 export interface GameState {
   phase: GamePhase
   mode: GameMode
+  freeplayVariant: FreeplayVariant
   dictionary: DictionaryData | null
   graph: WordGraph | null
   puzzle: Puzzle | null
+  exploreStartWord: string | null
+  remainingMoveCount: number | null
+  exploreEndedReason: ExploreEndedReason
   ladder: LadderStep[]
   activeMoveTypes: Set<MoveType>
   difficulty: number
@@ -34,24 +40,30 @@ export interface GameState {
 type GameAction =
   | { type: 'INIT'; dictionary: DictionaryData; graph: WordGraph }
   | { type: 'START_PUZZLE'; puzzle: Puzzle }
-  | { type: 'SUBMIT_WORD'; word: string; moveType: MoveType }
-  | { type: 'UNDO' }
-  | { type: 'RESET' }
+  | { type: 'START_EXPLORATION'; startWord: string; remainingMoveCount: number }
+  | { type: 'SUBMIT_WORD'; word: string; moveType: MoveType; remainingMoveCount?: number; complete?: boolean }
+  | { type: 'UNDO'; remainingMoveCount?: number }
+  | { type: 'RESET'; remainingMoveCount?: number }
   | { type: 'TOGGLE_MOVE_TYPE'; moveType: MoveType }
   | { type: 'SET_DIFFICULTY'; difficulty: number }
   | { type: 'SET_MODE'; mode: GameMode }
+  | { type: 'SET_FREEPLAY_VARIANT'; variant: FreeplayVariant }
   | { type: 'VICTORY' }
   | { type: 'SET_ERROR'; error: string }
   | { type: 'CLEAR_ERROR' }
   | { type: 'GO_TO_MENU' }
   | { type: 'LOAD_SHARED'; puzzle: Puzzle; sharerMoveCount: number; sharerMoveTypes: MoveType[] }
 
-const initialState: GameState = {
+export const initialState: GameState = {
   phase: 'loading',
   mode: 'freeplay',
+  freeplayVariant: 'puzzle',
   dictionary: null,
   graph: null,
   puzzle: null,
+  exploreStartWord: null,
+  remainingMoveCount: null,
+  exploreEndedReason: null,
   ladder: [],
   activeMoveTypes: new Set(MOVE_TYPES),
   difficulty: 4,
@@ -60,7 +72,7 @@ const initialState: GameState = {
   sharerMoveTypes: null,
 }
 
-function gameReducer(state: GameState, action: GameAction): GameState {
+export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case 'INIT':
       return {
@@ -74,7 +86,21 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         phase: 'playing',
         puzzle: action.puzzle,
+        exploreStartWord: null,
+        remainingMoveCount: null,
+        exploreEndedReason: null,
         ladder: [{ word: action.puzzle.startWord, moveType: null }],
+        error: null,
+      }
+    case 'START_EXPLORATION':
+      return {
+        ...state,
+        phase: action.remainingMoveCount === 0 ? 'victory' : 'playing',
+        puzzle: null,
+        exploreStartWord: action.startWord,
+        remainingMoveCount: action.remainingMoveCount,
+        exploreEndedReason: action.remainingMoveCount === 0 ? 'stuck' : null,
+        ladder: [{ word: action.startWord, moveType: null }],
         error: null,
       }
     case 'SUBMIT_WORD': {
@@ -82,11 +108,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         ...state.ladder,
         { word: action.word, moveType: action.moveType },
       ]
-      const isVictory = action.word === state.puzzle?.endWord
+      const isExploration = state.exploreStartWord !== null
+      const isVictory = isExploration
+        ? Boolean(action.complete)
+        : action.word === state.puzzle?.endWord
       return {
         ...state,
         ladder: newLadder,
         phase: isVictory ? 'victory' : state.phase,
+        remainingMoveCount: isExploration ? action.remainingMoveCount ?? state.remainingMoveCount : null,
+        exploreEndedReason: isExploration && isVictory ? 'stuck' : null,
         error: null,
       }
     }
@@ -96,25 +127,32 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         ladder: state.ladder.slice(0, -1),
         phase: 'playing',
+        remainingMoveCount: state.exploreStartWord ? action.remainingMoveCount ?? state.remainingMoveCount : null,
+        exploreEndedReason: state.exploreStartWord ? null : state.exploreEndedReason,
         error: null,
       }
     case 'RESET':
-      if (!state.puzzle) return state
+      if (!state.puzzle && !state.exploreStartWord) return state
       return {
         ...state,
-        ladder: [{ word: state.puzzle.startWord, moveType: null }],
+        ladder: [{ word: state.puzzle ? state.puzzle.startWord : state.exploreStartWord!, moveType: null }],
         phase: 'playing',
+        remainingMoveCount: state.exploreStartWord ? action.remainingMoveCount ?? state.remainingMoveCount : null,
+        exploreEndedReason: state.exploreStartWord ? null : state.exploreEndedReason,
         error: null,
       }
     case 'TOGGLE_MOVE_TYPE': {
       const next = new Set(state.activeMoveTypes)
       if (next.has(action.moveType)) {
         if (next.size > 1) next.delete(action.moveType)
-      } else {
-        next.add(action.moveType)
-      }
-      // Recalculate optimal length if we have a puzzle and graph
+        } else {
+          next.add(action.moveType)
+        }
       let puzzle = state.puzzle
+      let phase = state.phase
+      let remainingMoveCount = state.remainingMoveCount
+      let exploreEndedReason = state.exploreEndedReason
+
       if (puzzle && state.graph) {
         const result = findShortestPath(
           puzzle.startWord,
@@ -127,13 +165,21 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           activeMoveTypes: Array.from(next),
           optimalLength: result.pathLength,
         }
+      } else if (state.exploreStartWord && state.graph && state.ladder.length > 0) {
+        const currentWord = state.ladder[state.ladder.length - 1].word
+        const visitedWords = new Set(state.ladder.map(step => step.word))
+        remainingMoveCount = getUnusedNeighborCount(currentWord, state.graph, Array.from(next), visitedWords)
+        phase = remainingMoveCount === 0 ? 'victory' : 'playing'
+        exploreEndedReason = remainingMoveCount === 0 ? 'stuck' : null
       }
-      return { ...state, activeMoveTypes: next, puzzle }
+      return { ...state, activeMoveTypes: next, puzzle, phase, remainingMoveCount, exploreEndedReason }
     }
     case 'SET_DIFFICULTY':
       return { ...state, difficulty: action.difficulty }
     case 'SET_MODE':
       return { ...state, mode: action.mode }
+    case 'SET_FREEPLAY_VARIANT':
+      return { ...state, freeplayVariant: action.variant, error: null }
     case 'VICTORY':
       return { ...state, phase: 'victory' }
     case 'SET_ERROR':
@@ -141,12 +187,27 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'CLEAR_ERROR':
       return { ...state, error: null }
     case 'GO_TO_MENU':
-      return { ...state, phase: 'menu', puzzle: null, ladder: [], error: null, sharerMoveCount: null, sharerMoveTypes: null }
+      return {
+        ...state,
+        phase: 'menu',
+        puzzle: null,
+        exploreStartWord: null,
+        remainingMoveCount: null,
+        exploreEndedReason: null,
+        ladder: [],
+        error: null,
+        sharerMoveCount: null,
+        sharerMoveTypes: null,
+      }
     case 'LOAD_SHARED':
       return {
         ...state,
         phase: 'shared-view',
         puzzle: action.puzzle,
+        freeplayVariant: 'puzzle',
+        exploreStartWord: null,
+        remainingMoveCount: null,
+        exploreEndedReason: null,
         ladder: [{ word: action.puzzle.startWord, moveType: null }],
         sharerMoveCount: action.sharerMoveCount,
         sharerMoveTypes: action.sharerMoveTypes,
@@ -192,7 +253,7 @@ export function useGame() {
 
   const submitWord = useCallback(
     (word: string) => {
-      if (!state.graph || !state.dictionary || !state.puzzle) return
+      if (!state.graph || !state.dictionary || (!state.puzzle && !state.exploreStartWord)) return
       const w = word.toLowerCase().trim()
       const wordSet = getWordSet(state.dictionary)
 
@@ -204,6 +265,11 @@ export function useGame() {
       const currentWord = state.ladder[state.ladder.length - 1].word
       if (w === currentWord) {
         dispatch({ type: 'SET_ERROR', error: 'Same as current word' })
+        return
+      }
+
+      if (state.exploreStartWord && state.ladder.some(step => step.word === w)) {
+        dispatch({ type: 'SET_ERROR', error: 'Word already used in this run' })
         return
       }
 
@@ -221,9 +287,17 @@ export function useGame() {
         return
       }
 
+      if (state.exploreStartWord) {
+        const visitedWords = new Set(state.ladder.map(step => step.word))
+        visitedWords.add(w)
+        const remainingMoveCount = getUnusedNeighborCount(w, state.graph, Array.from(state.activeMoveTypes), visitedWords)
+        dispatch({ type: 'SUBMIT_WORD', word: w, moveType, remainingMoveCount, complete: remainingMoveCount === 0 })
+        return
+      }
+
       dispatch({ type: 'SUBMIT_WORD', word: w, moveType })
     },
-    [state.graph, state.dictionary, state.puzzle, state.ladder, state.activeMoveTypes]
+    [state.graph, state.dictionary, state.puzzle, state.exploreStartWord, state.ladder, state.activeMoveTypes]
   )
 
   const startFreeplay = useCallback(
@@ -270,6 +344,29 @@ export function useGame() {
     [state.graph, state.dictionary, state.activeMoveTypes, state.difficulty]
   )
 
+  const startExploration = useCallback(
+    (startWord: string) => {
+      if (!state.graph || !state.dictionary) return
+      const wordSet = getWordSet(state.dictionary)
+      const normalizedStart = startWord.toLowerCase().trim()
+
+      if (!wordSet.has(normalizedStart)) {
+        dispatch({ type: 'SET_ERROR', error: `"${normalizedStart}" is not in the dictionary` })
+        return
+      }
+
+      const remainingMoveCount = getUnusedNeighborCount(
+        normalizedStart,
+        state.graph,
+        Array.from(state.activeMoveTypes),
+        new Set([normalizedStart])
+      )
+
+      dispatch({ type: 'START_EXPLORATION', startWord: normalizedStart, remainingMoveCount })
+    },
+    [state.graph, state.dictionary, state.activeMoveTypes]
+  )
+
   const startDaily = useCallback(() => {
     if (!state.graph) return
     const puzzle = getDailyPuzzle(new Date(), state.graph)
@@ -285,13 +382,54 @@ export function useGame() {
     dispatch({ type: 'START_PUZZLE', puzzle: state.puzzle })
   }, [state.puzzle])
 
+  const undo = useCallback(() => {
+    if (!state.graph || state.ladder.length <= 1) {
+      dispatch({ type: 'UNDO' })
+      return
+    }
+
+    if (state.exploreStartWord) {
+      const nextLadder = state.ladder.slice(0, -1)
+      const currentWord = nextLadder[nextLadder.length - 1].word
+      const visitedWords = new Set(nextLadder.map(step => step.word))
+      const remainingMoveCount = getUnusedNeighborCount(currentWord, state.graph, Array.from(state.activeMoveTypes), visitedWords)
+      dispatch({ type: 'UNDO', remainingMoveCount })
+      return
+    }
+
+    dispatch({ type: 'UNDO' })
+  }, [state.graph, state.ladder, state.exploreStartWord, state.activeMoveTypes])
+
+  const reset = useCallback(() => {
+    if (!state.graph) {
+      dispatch({ type: 'RESET' })
+      return
+    }
+
+    if (state.exploreStartWord) {
+      const remainingMoveCount = getUnusedNeighborCount(
+        state.exploreStartWord,
+        state.graph,
+        Array.from(state.activeMoveTypes),
+        new Set([state.exploreStartWord])
+      )
+      dispatch({ type: 'RESET', remainingMoveCount })
+      return
+    }
+
+    dispatch({ type: 'RESET' })
+  }, [state.graph, state.exploreStartWord, state.activeMoveTypes])
+
   return {
     state,
     dispatch,
     init,
     submitWord,
     startFreeplay,
+    startExploration,
     startDaily,
     playSharedPuzzle,
+    undo,
+    reset,
   }
 }
