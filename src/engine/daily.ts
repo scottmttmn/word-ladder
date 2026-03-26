@@ -25,7 +25,7 @@ export function getDailyPuzzle(
   date: Date,
   graph: WordGraph
 ): Puzzle | null {
-  const dateStr = date.toISOString().slice(0, 10) // "YYYY-MM-DD"
+  const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
   const seed = xmur3(dateStr)
   const prng = mulberry32(seed)
   const dayOfWeek = date.getDay()
